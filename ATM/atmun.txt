@@ -1,0 +1,117 @@
+import javax.swing.*;
+import java.awt.*;
+import java.io.*;
+import java.util.HashMap;
+
+public class UnlockTool extends JFrame {
+    private static final String ACCOUNTS_FILE = "accounts.dat";
+    private HashMap<String, Atmsystem.AccountInfo> accounts;
+
+    public UnlockTool() {
+        setTitle("ATM账户解冻工具");
+        setSize(400, 300);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+
+        // 加载账户数据
+        loadAccounts();
+
+        // 创建主面板
+        JPanel mainPanel = new JPanel();
+        mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.Y_AXIS));
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        mainPanel.setBackground(new Color(0, 72, 145));
+
+        // 创建组件
+        JLabel titleLabel = new JLabel("ATM账户解冻工具");
+        titleLabel.setFont(new Font("Dialog", Font.BOLD, 24));
+        titleLabel.setForeground(Color.WHITE);
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JTextField cardField = new JTextField(15);
+        cardField.setMaximumSize(new Dimension(200, 30));
+        cardField.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JButton unlockButton = new JButton("解冻账户");
+        unlockButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        unlockButton.setMaximumSize(new Dimension(200, 30));
+
+        // 添加事件处理
+        unlockButton.addActionListener(e -> {
+            String cardNumber = cardField.getText().trim();
+            if (cardNumber.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "请输入卡号！");
+                return;
+            }
+
+            Atmsystem.AccountInfo account = accounts.get(cardNumber);
+            if (account == null) {
+                JOptionPane.showMessageDialog(this, "卡号不存在！");
+                return;
+            }
+
+            if (!account.isLocked) {
+                JOptionPane.showMessageDialog(this, "该账户未被锁定！");
+                return;
+            }
+
+            account.isLocked = false;
+            account.loginAttempts = 5;
+            saveAccounts();
+            JOptionPane.showMessageDialog(this, "账户解冻成功！");
+            cardField.setText("");
+        });
+
+        // 添加组件到面板
+        mainPanel.add(Box.createVerticalStrut(20));
+        mainPanel.add(titleLabel);
+        mainPanel.add(Box.createVerticalStrut(30));
+        mainPanel.add(new JLabel("请输入要解冻的卡号：") {{
+            setForeground(Color.WHITE);
+            setAlignmentX(Component.CENTER_ALIGNMENT);
+        }});
+        mainPanel.add(Box.createVerticalStrut(10));
+        mainPanel.add(cardField);
+        mainPanel.add(Box.createVerticalStrut(20));
+        mainPanel.add(unlockButton);
+
+        add(mainPanel);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void loadAccounts() {
+        File file = new File(ACCOUNTS_FILE);
+        if (file.exists()) {
+            try (ObjectInputStream ois = new ObjectInputStream(
+                    new FileInputStream(file))) {
+                accounts = (HashMap<String, Atmsystem.AccountInfo>) ois.readObject();
+            } catch (IOException | ClassNotFoundException e) {
+                e.printStackTrace();
+                accounts = new HashMap<>();
+            }
+        } else {
+            accounts = new HashMap<>();
+        }
+    }
+
+    private void saveAccounts() {
+        try (ObjectOutputStream oos = new ObjectOutputStream(
+                new FileOutputStream(ACCOUNTS_FILE))) {
+            oos.writeObject(accounts);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void main(String[] args) {
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        SwingUtilities.invokeLater(() -> {
+            new UnlockTool().setVisible(true);
+        });
+    }
+}

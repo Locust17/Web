@@ -1,0 +1,6 @@
+1.常见数据类型
+2.数据类型
+定义变量(弱类型)
+$变量名 = 赋值
+
+php的数据类型: string integer float boolean null obieck

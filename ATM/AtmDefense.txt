@@ -1,0 +1,773 @@
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.io.*;
+import java.util.*;
+
+public class Atmsystem extends JFrame {
+    private HashMap<String, AccountInfo> accounts = new HashMap<>();
+    private static final String ACCOUNTS_FILE = "accounts.dat";
+    private JPanel mainPanel;
+    private CardLayout cardLayout;
+    private AccountInfo currentAccount;
+
+    // 账户信息类
+    public static class AccountInfo implements Serializable {
+        String cardNumber;
+        String password;
+        String idCard;
+        double balance;
+        int loginAttempts;
+        boolean isLocked;
+        static final int MAX_CARDS_PER_ID = 2; // 每个身份证最多两张卡
+
+        AccountInfo(String cardNumber, String password, String idCard) {
+            this.cardNumber = cardNumber;
+            this.password = password;
+            this.idCard = idCard;
+            this.balance = 10000;
+            this.loginAttempts = 5;
+            this.isLocked = false;
+        }
+    }
+
+    public Atmsystem() {
+        loadAccounts();
+        setTitle("ATM系统");
+        setSize(800, 600);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+
+        cardLayout = new CardLayout();
+        mainPanel = new JPanel(cardLayout);
+        mainPanel.setBackground(new Color(0, 72, 145));
+        add(mainPanel);
+
+        createWelcomePanel();
+        createLoginPanel();
+        createRegisterPanel();
+        createQueryPanel();
+        createMainMenuPanel();
+        createWithdrawPanel();
+        createDepositPanel();
+        createChangePasswordPanel();
+
+        cardLayout.show(mainPanel, "welcome");
+
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                saveAccounts();
+            }
+        });
+    }
+
+    private JButton createATMButton(String text) {
+        JButton button = new JButton(text);
+        button.setPreferredSize(new Dimension(150, 50));
+        button.setMaximumSize(new Dimension(150, 50));
+        button.setMinimumSize(new Dimension(150, 50));
+        button.setBackground(new Color(51, 122, 183));
+        button.setForeground(Color.WHITE);
+        button.setFocusPainted(false);
+        button.setBorderPainted(false);
+        button.setFont(new Font("Dialog", Font.BOLD, 14));
+        button.setAlignmentX(Component.CENTER_ALIGNMENT);
+        
+        button.addMouseListener(new MouseAdapter() {
+            public void mouseEntered(MouseEvent e) {
+                button.setBackground(new Color(40, 96, 144));
+            }
+            public void mouseExited(MouseEvent e) {
+                button.setBackground(new Color(51, 122, 183));
+            }
+        });
+        
+        return button;
+    }
+
+    private JTextField createStyledTextField() {
+        JTextField textField = new JTextField(15);
+        textField.setMaximumSize(new Dimension(200, 30));
+        textField.setMinimumSize(new Dimension(200, 30));
+        textField.setPreferredSize(new Dimension(200, 30));
+        textField.setAlignmentX(Component.CENTER_ALIGNMENT);
+        textField.setHorizontalAlignment(JTextField.CENTER);
+        return textField;
+    }
+
+    private JPasswordField createStyledPasswordField() {
+        JPasswordField passwordField = new JPasswordField(15);
+        passwordField.setMaximumSize(new Dimension(200, 30));
+        passwordField.setMinimumSize(new Dimension(200, 30));
+        passwordField.setPreferredSize(new Dimension(200, 30));
+        passwordField.setAlignmentX(Component.CENTER_ALIGNMENT);
+        passwordField.setHorizontalAlignment(JPasswordField.CENTER);
+        return passwordField;
+    }
+
+    private JLabel createStyledLabel(String text) {
+        JLabel label = new JLabel(text);
+        label.setForeground(Color.WHITE);
+        label.setAlignmentX(Component.CENTER_ALIGNMENT);
+        return label;
+    }
+    private void createWelcomePanel() {
+        JPanel welcomePanel = new JPanel();
+        welcomePanel.setLayout(new BoxLayout(welcomePanel, BoxLayout.Y_AXIS));
+        welcomePanel.setBorder(BorderFactory.createEmptyBorder(50, 50, 50, 50));
+        welcomePanel.setBackground(new Color(0, 72, 145));
+        welcomePanel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel titleLabel = new JLabel("欢迎使用ATM系统");
+        titleLabel.setFont(new Font("Dialog", Font.BOLD, 32));
+        titleLabel.setForeground(Color.WHITE);
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JButton loginButton = createATMButton("登录");
+        JButton registerButton = createATMButton("开户");
+        JButton queryButton = createATMButton("查询卡号");
+
+        loginButton.addActionListener(e -> cardLayout.show(mainPanel, "login"));
+        registerButton.addActionListener(e -> cardLayout.show(mainPanel, "register"));
+        queryButton.addActionListener(e -> cardLayout.show(mainPanel, "query"));
+
+        welcomePanel.add(Box.createVerticalGlue());
+        welcomePanel.add(titleLabel);
+        welcomePanel.add(Box.createVerticalStrut(50));
+        welcomePanel.add(loginButton);
+        welcomePanel.add(Box.createVerticalStrut(20));
+        welcomePanel.add(registerButton);
+        welcomePanel.add(Box.createVerticalStrut(20));
+        welcomePanel.add(queryButton);
+        welcomePanel.add(Box.createVerticalGlue());
+
+        mainPanel.add(welcomePanel, "welcome");
+    }
+
+    private void createLoginPanel() {
+        JPanel loginPanel = new JPanel();
+        loginPanel.setLayout(new BoxLayout(loginPanel, BoxLayout.Y_AXIS));
+        loginPanel.setBorder(BorderFactory.createEmptyBorder(50, 50, 50, 50));
+        loginPanel.setBackground(new Color(0, 72, 145));
+        loginPanel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel titleLabel = new JLabel("ATM登录");
+        titleLabel.setFont(new Font("Dialog", Font.BOLD, 32));
+        titleLabel.setForeground(Color.WHITE);
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JTextField cardField = createStyledTextField();
+        JPasswordField passField = createStyledPasswordField();
+
+        JButton loginButton = createATMButton("登录");
+        JButton backButton = createATMButton("返回");
+
+        loginButton.addActionListener(e -> {
+            String cardNumber = cardField.getText();
+            String password = new String(passField.getPassword());
+            
+            AccountInfo account = accounts.get(cardNumber);
+            if (account == null) {
+                JOptionPane.showMessageDialog(this, "卡号不存在！");
+                return;
+            }
+
+            if (account.isLocked) {
+                JOptionPane.showMessageDialog(this, 
+                    "账户已被锁定！请持身份证到柜台解锁。", 
+                    "账户锁定", 
+                    JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            if (password.equals(account.password)) {
+                account.loginAttempts = 5;
+                currentAccount = account;
+                cardLayout.show(mainPanel, "mainMenu");
+                cardField.setText("");
+                passField.setText("");
+            } else {
+                account.loginAttempts--;
+                if (account.loginAttempts > 0) {
+                    JOptionPane.showMessageDialog(this, 
+                        "密码错误！还剩" + account.loginAttempts + "次尝试机会。");
+                } else {
+                    account.isLocked = true;
+                    JOptionPane.showMessageDialog(this, 
+                        "密码错误次数过多，账户已被锁定！请持身份证到柜台解锁。");
+                }
+            }
+            saveAccounts();
+        });
+
+        backButton.addActionListener(e -> {
+            cardLayout.show(mainPanel, "welcome");
+            cardField.setText("");
+            passField.setText("");
+        });
+
+        loginPanel.add(Box.createVerticalGlue());
+        loginPanel.add(titleLabel);
+        loginPanel.add(Box.createVerticalStrut(30));
+        loginPanel.add(createStyledLabel("卡号："));
+        loginPanel.add(Box.createVerticalStrut(5));
+        loginPanel.add(cardField);
+        loginPanel.add(Box.createVerticalStrut(20));
+        loginPanel.add(createStyledLabel("密码："));
+        loginPanel.add(Box.createVerticalStrut(5));
+        loginPanel.add(passField);
+        loginPanel.add(Box.createVerticalStrut(30));
+        loginPanel.add(loginButton);
+        loginPanel.add(Box.createVerticalStrut(10));
+        loginPanel.add(backButton);
+        loginPanel.add(Box.createVerticalGlue());
+
+        mainPanel.add(loginPanel, "login");
+    }
+    private void createRegisterPanel() {
+        JPanel registerPanel = new JPanel();
+        registerPanel.setLayout(new BoxLayout(registerPanel, BoxLayout.Y_AXIS));
+        registerPanel.setBorder(BorderFactory.createEmptyBorder(50, 50, 50, 50));
+        registerPanel.setBackground(new Color(0, 72, 145));
+
+        JLabel titleLabel = new JLabel("开户注册");
+        titleLabel.setFont(new Font("Dialog", Font.BOLD, 24));
+        titleLabel.setForeground(Color.WHITE);
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JTextField idCardField = createStyledTextField();
+        JPasswordField passwordField = createStyledPasswordField();
+        JPasswordField confirmPasswordField = createStyledPasswordField();
+
+        JLabel idCardLabel = createStyledLabel("身份证号：");
+        JLabel passwordLabel = createStyledLabel("密码：");
+        JLabel confirmPasswordLabel = createStyledLabel("确认密码：");
+
+        JButton registerButton = createATMButton("注册");
+        JButton backButton = createATMButton("返回");
+
+        registerButton.addActionListener(e -> {
+            String idCard = idCardField.getText();
+            String password = new String(passwordField.getPassword());
+            String confirmPassword = new String(confirmPasswordField.getPassword());
+
+            if (!isValidIdCard(idCard)) {
+                JOptionPane.showMessageDialog(this, "请输入有效的18位身份证号！");
+                return;
+            }
+
+            int cardCount = 0;
+            for (AccountInfo acc : accounts.values()) {
+                if (acc.idCard.equals(idCard)) {
+                    cardCount++;
+                }
+            }
+            if (cardCount >= AccountInfo.MAX_CARDS_PER_ID) {
+                JOptionPane.showMessageDialog(this, 
+                    "该身份证已开通" + AccountInfo.MAX_CARDS_PER_ID + "张卡，无法继续开卡！");
+                return;
+            }
+
+            if (password.length() < 6) {
+                JOptionPane.showMessageDialog(this, "密码长度不能少于6位！");
+                return;
+            }
+
+            if (!password.equals(confirmPassword)) {
+                JOptionPane.showMessageDialog(this, "两次输入的密码不一致！");
+                return;
+            }
+
+            String cardNumber = generateCardNumber();
+            accounts.put(cardNumber, new AccountInfo(cardNumber, password, idCard));
+            saveAccounts();
+
+            JOptionPane.showMessageDialog(this, 
+                "开户成功！\n您的卡号是：" + cardNumber + "\n请牢记您的卡号和密码！");
+            
+            idCardField.setText("");
+            passwordField.setText("");
+            confirmPasswordField.setText("");
+            cardLayout.show(mainPanel, "welcome");
+        });
+
+        backButton.addActionListener(e -> {
+            cardLayout.show(mainPanel, "welcome");
+            idCardField.setText("");
+            passwordField.setText("");
+            confirmPasswordField.setText("");
+        });
+
+        registerPanel.add(Box.createVerticalGlue());
+        registerPanel.add(titleLabel);
+        registerPanel.add(Box.createVerticalStrut(30));
+        registerPanel.add(idCardLabel);
+        registerPanel.add(Box.createVerticalStrut(5));
+        registerPanel.add(idCardField);
+        registerPanel.add(Box.createVerticalStrut(20));
+        registerPanel.add(passwordLabel);
+        registerPanel.add(Box.createVerticalStrut(5));
+        registerPanel.add(passwordField);
+        registerPanel.add(Box.createVerticalStrut(20));
+        registerPanel.add(confirmPasswordLabel);
+        registerPanel.add(Box.createVerticalStrut(5));
+        registerPanel.add(confirmPasswordField);
+        registerPanel.add(Box.createVerticalStrut(30));
+        registerPanel.add(registerButton);
+        registerPanel.add(Box.createVerticalStrut(10));
+        registerPanel.add(backButton);
+        registerPanel.add(Box.createVerticalGlue());
+
+        mainPanel.add(registerPanel, "register");
+    }
+
+    private void createMainMenuPanel() {
+        JPanel menuPanel = new JPanel(new BorderLayout());
+        menuPanel.setBackground(new Color(0, 72, 145));
+
+        JPanel centerPanel = new JPanel();
+        centerPanel.setLayout(new BoxLayout(centerPanel, BoxLayout.Y_AXIS));
+        centerPanel.setBackground(new Color(0, 72, 145));
+        
+        JLabel titleLabel = new JLabel("主菜单");
+        titleLabel.setFont(new Font("Dialog", Font.BOLD, 32));
+        titleLabel.setForeground(Color.WHITE);
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        
+        centerPanel.add(Box.createVerticalGlue());
+        centerPanel.add(titleLabel);
+        centerPanel.add(Box.createVerticalGlue());
+
+        JPanel leftPanel = new JPanel();
+        leftPanel.setLayout(new BoxLayout(leftPanel, BoxLayout.Y_AXIS));
+        leftPanel.setBackground(new Color(0, 72, 145));
+        leftPanel.setBorder(BorderFactory.createEmptyBorder(100, 20, 100, 20));
+
+        JPanel rightPanel = new JPanel();
+        rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
+        rightPanel.setBackground(new Color(0, 72, 145));
+        rightPanel.setBorder(BorderFactory.createEmptyBorder(100, 20, 100, 20));
+
+        JButton checkBalanceButton = createATMButton("查询余额 >>");
+        JButton withdrawButton = createATMButton("取款 >>");
+        JButton depositButton = createATMButton("<< 存款");
+        JButton changePasswordButton = createATMButton("<< 修改密码");
+        JButton logoutButton = createATMButton("退出 >>");
+
+        checkBalanceButton.addActionListener(e -> 
+            JOptionPane.showMessageDialog(this, 
+                String.format("当前余额：%.2f元", currentAccount.balance)));
+        
+        withdrawButton.addActionListener(e -> 
+            cardLayout.show(mainPanel, "withdraw"));
+        
+        depositButton.addActionListener(e -> 
+            cardLayout.show(mainPanel, "deposit"));
+        
+        changePasswordButton.addActionListener(e -> 
+            cardLayout.show(mainPanel, "changePassword"));
+        
+        logoutButton.addActionListener(e -> {
+            currentAccount = null;
+            cardLayout.show(mainPanel, "welcome");
+        });
+
+        leftPanel.add(Box.createVerticalGlue());
+        leftPanel.add(depositButton);
+        leftPanel.add(Box.createVerticalStrut(30));
+        leftPanel.add(changePasswordButton);
+        leftPanel.add(Box.createVerticalGlue());
+
+        rightPanel.add(Box.createVerticalGlue());
+        rightPanel.add(checkBalanceButton);
+        rightPanel.add(Box.createVerticalStrut(30));
+        rightPanel.add(withdrawButton);
+        rightPanel.add(Box.createVerticalStrut(30));
+        rightPanel.add(logoutButton);
+        rightPanel.add(Box.createVerticalGlue());
+
+        menuPanel.add(leftPanel, BorderLayout.WEST);
+        menuPanel.add(centerPanel, BorderLayout.CENTER);
+        menuPanel.add(rightPanel, BorderLayout.EAST);
+
+        mainPanel.add(menuPanel, "mainMenu");
+    }
+    private void createWithdrawPanel() {
+        JPanel withdrawPanel = new JPanel(new BorderLayout());
+        withdrawPanel.setBackground(new Color(0, 72, 145));
+
+        JPanel centerPanel = new JPanel();
+        centerPanel.setLayout(new BoxLayout(centerPanel, BoxLayout.Y_AXIS));
+        centerPanel.setBackground(new Color(0, 72, 145));
+        centerPanel.setBorder(BorderFactory.createEmptyBorder(50, 50, 50, 50));
+
+        JLabel titleLabel = new JLabel("请选择或输入取款金额");
+        titleLabel.setFont(new Font("Dialog", Font.BOLD, 24));
+        titleLabel.setForeground(Color.WHITE);
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JTextField amountField = createStyledTextField();
+
+        JPanel leftPanel = new JPanel();
+        leftPanel.setLayout(new BoxLayout(leftPanel, BoxLayout.Y_AXIS));
+        leftPanel.setBackground(new Color(0, 72, 145));
+        leftPanel.setBorder(BorderFactory.createEmptyBorder(100, 20, 100, 20));
+
+        JPanel rightPanel = new JPanel();
+        rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
+        rightPanel.setBackground(new Color(0, 72, 145));
+        rightPanel.setBorder(BorderFactory.createEmptyBorder(100, 20, 100, 20));
+
+        int[] quickAmounts = {100, 200, 500, 1000, 2000, 5000};
+        for (int i = 0; i < quickAmounts.length; i++) {
+            int amount = quickAmounts[i];
+            JButton quickButton;
+            if (i < quickAmounts.length/2) {
+                quickButton = createATMButton("<< " + amount);
+                leftPanel.add(quickButton);
+                leftPanel.add(Box.createVerticalStrut(20));
+            } else {
+                quickButton = createATMButton(amount + " >>");
+                rightPanel.add(quickButton);
+                rightPanel.add(Box.createVerticalStrut(20));
+            }
+
+            quickButton.addActionListener(e -> {
+                if (amount > currentAccount.balance) {
+                    JOptionPane.showMessageDialog(this, "余额不足！");
+                } else {
+                    currentAccount.balance -= amount;
+                    saveAccounts();
+                    JOptionPane.showMessageDialog(this, 
+                        String.format("取款成功！当前余额：%.2f元", currentAccount.balance));
+                    cardLayout.show(mainPanel, "mainMenu");
+                }
+            });
+        }
+
+        JButton confirmButton = createATMButton("确认");
+        JButton backButton = createATMButton("返回");
+
+        confirmButton.addActionListener(e -> {
+            try {
+                double amount = Double.parseDouble(amountField.getText());
+                if (amount <= 0) {
+                    JOptionPane.showMessageDialog(this, "请输入正确的金额！");
+                } else if (amount > currentAccount.balance) {
+                    JOptionPane.showMessageDialog(this, "余额不足！");
+                } else {
+                    currentAccount.balance -= amount;
+                    saveAccounts();
+                    JOptionPane.showMessageDialog(this, 
+                        String.format("取款成功！当前余额：%.2f元", currentAccount.balance));
+                    amountField.setText("");
+                    cardLayout.show(mainPanel, "mainMenu");
+                }
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "请输入有效的金额！");
+            }
+        });
+
+        backButton.addActionListener(e -> {
+            cardLayout.show(mainPanel, "mainMenu");
+            amountField.setText("");
+        });
+
+        centerPanel.add(Box.createVerticalGlue());
+        centerPanel.add(titleLabel);
+        centerPanel.add(Box.createVerticalStrut(30));
+        centerPanel.add(createStyledLabel("其他金额："));
+        centerPanel.add(Box.createVerticalStrut(5));
+        centerPanel.add(amountField);
+        centerPanel.add(Box.createVerticalStrut(20));
+        centerPanel.add(confirmButton);
+        centerPanel.add(Box.createVerticalStrut(10));
+        centerPanel.add(backButton);
+        centerPanel.add(Box.createVerticalGlue());
+
+        withdrawPanel.add(leftPanel, BorderLayout.WEST);
+        withdrawPanel.add(centerPanel, BorderLayout.CENTER);
+        withdrawPanel.add(rightPanel, BorderLayout.EAST);
+
+        mainPanel.add(withdrawPanel, "withdraw");
+    }
+
+    private void createDepositPanel() {
+        JPanel depositPanel = new JPanel(new BorderLayout());
+        depositPanel.setBackground(new Color(0, 72, 145));
+
+        JPanel centerPanel = new JPanel();
+        centerPanel.setLayout(new BoxLayout(centerPanel, BoxLayout.Y_AXIS));
+        centerPanel.setBackground(new Color(0, 72, 145));
+        centerPanel.setBorder(BorderFactory.createEmptyBorder(50, 50, 50, 50));
+
+        JLabel titleLabel = new JLabel("请选择或输入存款金额");
+        titleLabel.setFont(new Font("Dialog", Font.BOLD, 24));
+        titleLabel.setForeground(Color.WHITE);
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JTextField amountField = createStyledTextField();
+
+        JPanel leftPanel = new JPanel();
+        leftPanel.setLayout(new BoxLayout(leftPanel, BoxLayout.Y_AXIS));
+        leftPanel.setBackground(new Color(0, 72, 145));
+        leftPanel.setBorder(BorderFactory.createEmptyBorder(100, 20, 100, 20));
+
+        JPanel rightPanel = new JPanel();
+        rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
+        rightPanel.setBackground(new Color(0, 72, 145));
+        rightPanel.setBorder(BorderFactory.createEmptyBorder(100, 20, 100, 20));
+
+        int[] quickAmounts = {100, 200, 500, 1000, 2000, 5000};
+        for (int i = 0; i < quickAmounts.length; i++) {
+            int amount = quickAmounts[i];
+            JButton quickButton;
+            if (i < quickAmounts.length/2) {
+                quickButton = createATMButton("<< " + amount);
+                leftPanel.add(quickButton);
+                leftPanel.add(Box.createVerticalStrut(20));
+            } else {
+                quickButton = createATMButton(amount + " >>");
+                rightPanel.add(quickButton);
+                rightPanel.add(Box.createVerticalStrut(20));
+            }
+
+            quickButton.addActionListener(e -> {
+                currentAccount.balance += amount;
+                saveAccounts();
+                JOptionPane.showMessageDialog(this, 
+                    String.format("存款成功！当前余额：%.2f元", currentAccount.balance));
+                cardLayout.show(mainPanel, "mainMenu");
+            });
+        }
+
+        JButton confirmButton = createATMButton("确认");
+        JButton backButton = createATMButton("返回");
+
+        confirmButton.addActionListener(e -> {
+            try {
+                double amount = Double.parseDouble(amountField.getText());
+                if (amount <= 0) {
+                    JOptionPane.showMessageDialog(this, "请输入正确的金额！");
+                } else {
+                    currentAccount.balance += amount;
+                    saveAccounts();
+                    JOptionPane.showMessageDialog(this, 
+                        String.format("存款成功！当前余额：%.2f元", currentAccount.balance));
+                    amountField.setText("");
+                    cardLayout.show(mainPanel, "mainMenu");
+                }
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "请输入有效的金额！");
+            }
+        });
+
+        backButton.addActionListener(e -> {
+            cardLayout.show(mainPanel, "mainMenu");
+            amountField.setText("");
+        });
+
+        centerPanel.add(Box.createVerticalGlue());
+        centerPanel.add(titleLabel);
+        centerPanel.add(Box.createVerticalStrut(30));
+        centerPanel.add(createStyledLabel("其他金额："));
+        centerPanel.add(Box.createVerticalStrut(5));
+        centerPanel.add(amountField);
+        centerPanel.add(Box.createVerticalStrut(20));
+        centerPanel.add(confirmButton);
+        centerPanel.add(Box.createVerticalStrut(10));
+        centerPanel.add(backButton);
+        centerPanel.add(Box.createVerticalGlue());
+
+        depositPanel.add(leftPanel, BorderLayout.WEST);
+        depositPanel.add(centerPanel, BorderLayout.CENTER);
+        depositPanel.add(rightPanel, BorderLayout.EAST);
+
+        mainPanel.add(depositPanel, "deposit");
+    }
+    private void createChangePasswordPanel() {
+        JPanel changePassPanel = new JPanel();
+        changePassPanel.setLayout(new BoxLayout(changePassPanel, BoxLayout.Y_AXIS));
+        changePassPanel.setBorder(BorderFactory.createEmptyBorder(50, 50, 50, 50));
+        changePassPanel.setBackground(new Color(0, 72, 145));
+
+        JLabel titleLabel = new JLabel("修改密码");
+        titleLabel.setFont(new Font("Dialog", Font.BOLD, 24));
+        titleLabel.setForeground(Color.WHITE);
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JPasswordField oldPassField = createStyledPasswordField();
+        JPasswordField newPassField = createStyledPasswordField();
+        JPasswordField confirmPassField = createStyledPasswordField();
+
+        JButton confirmButton = createATMButton("确认");
+        JButton backButton = createATMButton("返回");
+
+        confirmButton.addActionListener(e -> {
+            String oldPass = new String(oldPassField.getPassword());
+            String newPass = new String(newPassField.getPassword());
+            String confirmPass = new String(confirmPassField.getPassword());
+
+            if (!oldPass.equals(currentAccount.password)) {
+                JOptionPane.showMessageDialog(this, "原密码错误！");
+            } else if (newPass.length() < 6) {
+                JOptionPane.showMessageDialog(this, "新密码长度不能少于6位！");
+            } else if (!newPass.equals(confirmPass)) {
+                JOptionPane.showMessageDialog(this, "两次输入的新密码不一致！");
+            } else {
+                currentAccount.password = newPass;
+                saveAccounts();
+                JOptionPane.showMessageDialog(this, "密码修改成功！");
+                oldPassField.setText("");
+                newPassField.setText("");
+                confirmPassField.setText("");
+                cardLayout.show(mainPanel, "mainMenu");
+            }
+        });
+
+        backButton.addActionListener(e -> {
+            cardLayout.show(mainPanel, "mainMenu");
+            oldPassField.setText("");
+            newPassField.setText("");
+            confirmPassField.setText("");
+        });
+
+        changePassPanel.add(Box.createVerticalGlue());
+        changePassPanel.add(titleLabel);
+        changePassPanel.add(Box.createVerticalStrut(30));
+        changePassPanel.add(createStyledLabel("原密码："));
+        changePassPanel.add(Box.createVerticalStrut(5));
+        changePassPanel.add(oldPassField);
+        changePassPanel.add(Box.createVerticalStrut(20));
+        changePassPanel.add(createStyledLabel("新密码："));
+        changePassPanel.add(Box.createVerticalStrut(5));
+        changePassPanel.add(newPassField);
+        changePassPanel.add(Box.createVerticalStrut(20));
+        changePassPanel.add(createStyledLabel("确认新密码："));
+        changePassPanel.add(Box.createVerticalStrut(5));
+        changePassPanel.add(confirmPassField);
+        changePassPanel.add(Box.createVerticalStrut(30));
+        changePassPanel.add(confirmButton);
+        changePassPanel.add(Box.createVerticalStrut(10));
+        changePassPanel.add(backButton);
+        changePassPanel.add(Box.createVerticalGlue());
+
+        mainPanel.add(changePassPanel, "changePassword");
+    }
+
+    private void createQueryPanel() {
+        JPanel queryPanel = new JPanel();
+        queryPanel.setLayout(new BoxLayout(queryPanel, BoxLayout.Y_AXIS));
+        queryPanel.setBorder(BorderFactory.createEmptyBorder(50, 50, 50, 50));
+        queryPanel.setBackground(new Color(0, 72, 145));
+
+        JLabel titleLabel = new JLabel("查询卡号");
+        titleLabel.setFont(new Font("Dialog", Font.BOLD, 24));
+        titleLabel.setForeground(Color.WHITE);
+        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JTextField idCardField = createStyledTextField();
+        JButton queryButton = createATMButton("查询");
+        JButton backButton = createATMButton("返回");
+
+        queryButton.addActionListener(e -> {
+            String idCard = idCardField.getText();
+            if (!isValidIdCard(idCard)) {
+                JOptionPane.showMessageDialog(this, "请输入有效的18位身份证号！");
+                return;
+            }
+
+            StringBuilder cardInfo = new StringBuilder("查询结果：\n\n");
+            boolean found = false;
+            for (AccountInfo acc : accounts.values()) {
+                if (acc.idCard.equals(idCard)) {
+                    cardInfo.append("卡号：").append(acc.cardNumber)
+                           .append(acc.isLocked ? " (已锁定)" : " (正常)")
+                           .append("\n");
+                    found = true;
+                }
+            }
+
+            if (!found) {
+                JOptionPane.showMessageDialog(this, "未找到与该身份证关联的卡号！");
+            } else {
+                JOptionPane.showMessageDialog(this, cardInfo.toString());
+            }
+            idCardField.setText("");
+        });
+
+        backButton.addActionListener(e -> {
+            cardLayout.show(mainPanel, "welcome");
+            idCardField.setText("");
+        });
+
+        queryPanel.add(Box.createVerticalGlue());
+        queryPanel.add(titleLabel);
+        queryPanel.add(Box.createVerticalStrut(30));
+        queryPanel.add(createStyledLabel("请输入身份证号："));
+        queryPanel.add(Box.createVerticalStrut(5));
+        queryPanel.add(idCardField);
+        queryPanel.add(Box.createVerticalStrut(30));
+        queryPanel.add(queryButton);
+        queryPanel.add(Box.createVerticalStrut(10));
+        queryPanel.add(backButton);
+        queryPanel.add(Box.createVerticalGlue());
+
+        mainPanel.add(queryPanel, "query");
+    }
+
+    private String generateCardNumber() {
+        Random random = new Random();
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 6; i++) {
+            sb.append(random.nextInt(10));
+        }
+        while (accounts.containsKey(sb.toString())) {
+            sb.setLength(0);
+            for (int i = 0; i < 6; i++) {
+                sb.append(random.nextInt(10));
+            }
+        }
+        return sb.toString();
+    }
+
+    private boolean isValidIdCard(String idCard) {
+        return idCard.length() == 18 && idCard.matches("\\d{17}[0-9X]");
+    }
+
+    private void saveAccounts() {
+        try (ObjectOutputStream oos = new ObjectOutputStream(
+                new FileOutputStream(ACCOUNTS_FILE))) {
+            oos.writeObject(accounts);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void loadAccounts() {
+        File file = new File(ACCOUNTS_FILE);
+        if (file.exists()) {
+            try (ObjectInputStream ois = new ObjectInputStream(
+                    new FileInputStream(file))) {
+                accounts = (HashMap<String, AccountInfo>) ois.readObject();
+            } catch (IOException | ClassNotFoundException e) {
+                e.printStackTrace();
+                accounts = new HashMap<>();
+            }
+        }
+    }
+
+    public static void main(String[] args) {
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        
+        SwingUtilities.invokeLater(() -> {
+            new Atmsystem().setVisible(true);
+        });
+    }
+}
