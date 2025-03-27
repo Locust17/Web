@@ -4,8 +4,8 @@ layout: home
 
 hero:
   name: "小白的日记root"
-  text: "部署网站"
-  tagline: My great project tagline
+  text: "10.17相遇-->11.2号在一起"
+  tagline: Hope BSY is happy every day. Hope we will always be together and grow up together.
   actions:
     - theme: brand
       text: Markdown Examples
@@ -16,10 +16,10 @@ hero:
 
 features:
   - title: Feature A
-    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
+    details: 第一个月的恋爱日记Before
   - title: Feature B
-    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
+    details: 一百天的恋爱日记We
   - title: Feature C
-    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
+    details: 两百天的恋爱日记Now
 ---
 
