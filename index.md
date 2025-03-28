@@ -4,7 +4,7 @@ layout: home
 
 hero:
   name: "小白的日记root"
-  text: "10.17相遇-->11.2号在一起"
+  text: "10.17相遇->11.2号在一起"
   tagline: Hope BSY is happy every day. Hope we will always be together and grow up together.
   actions:
     - theme: brand
